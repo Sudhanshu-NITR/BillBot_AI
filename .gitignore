@@ -1,0 +1,12 @@
+# Python virtual environment
+venv/
+pycache/
+
+# Environment variables
+.env
+
+# Service account credentials file (if you keep a local copy)
+service_account.json
+
+# Downloaded files
+downloads/
