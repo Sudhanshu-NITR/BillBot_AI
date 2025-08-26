@@ -9,3 +9,9 @@ python-dotenv
 
 # Retries Logic
 tenacity
+
+# Requirements for ParserAgent
+pdfplumber
+
+# Google Cloud Vision API for OCR detection
+google-cloud-vision
