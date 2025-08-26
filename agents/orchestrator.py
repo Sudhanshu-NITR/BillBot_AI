@@ -1,3 +1,4 @@
+import os
 from agents.drive_agent import DriveAgent
 from agents.parser_agent import ParserAgent
 from agents.llm_agent import LLMAgent
@@ -38,6 +39,7 @@ class Orchestrator:
         
         # Looping through files, download, parse, and extract data
         all_extracted_data = []
+        downloaded_file_paths = []
         total_files = len(drive_files)
 
         for i, file_obj in enumerate(drive_files):
@@ -49,6 +51,8 @@ class Orchestrator:
             if not downloaded_path:
                 print(f"Skipping file {file_title} due to download failure")
                 continue
+
+            downloaded_file_paths.append(downloaded_path)
 
             # Parsing the file to extract raw text
             raw_text = self.parser_agent.parse_file(downloaded_path)
@@ -71,11 +75,15 @@ class Orchestrator:
 
         if not all_extracted_data:
             print("\nNo data was successfully extracted from any file. No Excel report was generated")
+            self._cleanup_temp_files(downloaded_file_paths)
             return None
         
         # Using excel agent to create the final report
         print(f"\nFinalizing Process...")
         final_excel_path = self.excel_agent.create_excel_from_data(all_extracted_data)
+
+        # Cleaning up the downloaded invoice files now since they are processed
+        self._cleanup_temp_files(downloaded_file_paths)
 
         if final_excel_path:
             print(f"\n🎉 Workflow complete! Final report is available at: {final_excel_path}")
@@ -83,6 +91,15 @@ class Orchestrator:
             print("\nWorkflow finished, but failed to generate the final Excel report.")
 
         return final_excel_path
+    
+    def _cleanup_temp_files(self, file_paths):
+        print(f"Cleaning up {len(file_paths)} temporary invoice file(s)...")
+        for path in file_paths:
+            try:
+                if os.path.exists(path):
+                    os.remove(path)
+            except OSError as e:
+                print(f"Error deleting temporary file {path}: {e}")
     
     
 if __name__ == '__main__':
@@ -92,6 +109,6 @@ if __name__ == '__main__':
         orchestrator = Orchestrator()
         orchestrator.process_invoices_from_drive(test_folder_link)
     except Exception as e:
-        print(f"\n🚨 A fatal error occurred in the main orchestrator block: {e}")
+        print(f"\nA fatal error occurred in the main orchestrator block: {e}")
 
         

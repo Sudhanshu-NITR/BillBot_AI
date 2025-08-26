@@ -1,14 +1,18 @@
 # Python virtual environment
 venv/
-pycache/
 __pycache__/
 
 # Environment variables
 .env
 
-# Service account credentials file (if you keep a local copy)
+# Service account credentials file
 service_account.json
 
-# Downloaded files
+# Downloaded and processed files
 downloads/
 Processed/
+
+# IDE and OS specific files
+.vscode/
+.idea/
+*.DS_Store
