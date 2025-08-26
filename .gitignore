@@ -1,6 +1,7 @@
 # Python virtual environment
 venv/
 pycache/
+__pycache__/
 
 # Environment variables
 .env
@@ -10,3 +11,4 @@ service_account.json
 
 # Downloaded files
 downloads/
+Processed/

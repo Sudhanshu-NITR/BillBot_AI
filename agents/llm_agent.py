@@ -1,5 +1,6 @@
 import os
 import json
+import re
 from dotenv import load_dotenv
 import google.generativeai as genai
 
@@ -38,16 +39,21 @@ class LLMAgent:
         # Clean the markdown formatting done by LLM Agent
 
         start_index = raw_response_text.find('{')
-        end_index = raw_response_text.find('}')
+        end_index = raw_response_text.rfind('}')
 
         if start_index != -1 and end_index != -1 and end_index > start_index:
-            # Slicing the string to get only the required content
             return raw_response_text[start_index : end_index + 1]
         else:
-            # If no JSON object is found, return an empty JSON object string
             print("Could not find a valid JSON object in the LLM response.")
             return "{}"
         
+    def safe_json_parse(self, text):
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError:
+            text = re.sub(r",\s*}", "}", text)
+            text = re.sub(r",\s*]", "]", text)
+            return json.loads(text)
     
     def extract_invoice_data(self, raw_text):
         # Send the raw text from an invoice and to LLM and get structured JSON format
@@ -56,19 +62,38 @@ class LLMAgent:
             return None
         
         prompt = f"""
-        You are an expert AI assistant specializing in invoice data extraction.
-        Your task is to analyze the raw text provided below and extract the key information into a structured JSON format.
+        You are an expert AI assistant for invoice data extraction.
+        Your task is to analyze the raw text and extract information into a valid JSON format.
 
-        Follow these rules strictly:
-        1.  Extract the following fields: InvoiceNumber, InvoiceDate, VendorName, CustomerName, GSTIN, Subtotal, Tax, TotalAmount, Currency, PaymentTerms, ItemsList.
-        2.  The "ItemsList" should be an array of objects, where each object has "Description", "Quantity", "UnitPrice", and "Amount".
-        3.  If a field is not found in the text, you MUST use the value "N/A". Do not make up information.
-        4.  The output MUST be a single, valid JSON object. Do not include any text or explanations before or after the JSON.
-        5.  For dates, use the YYYY-MM-DD format if possible.
-        6.  For numerical values (Subtotal, Tax, TotalAmount), extract only the numbers, without currency symbols.
+        **CRITICAL RULES:**
+        1.  The final output MUST be a single, valid JSON object. Do not include any text before or after the JSON.
+        2.  Extract these fields: InvoiceNumber, InvoiceDate, VendorName, CustomerName, GSTIN, Subtotal, Tax, TotalAmount, Currency, PaymentTerms, ItemsList.
+        3.  If a field is not found, you MUST use the value "N/A".
+        4.  For numerical fields (Subtotal, Tax, TotalAmount, Quantity, UnitPrice, Amount), the value MUST be a number (e.g., 1250.00), NOT a string (e.g., "1250.00"). If not found, use "N/A".
+        5.  The "ItemsList" field MUST be an array of objects. Each object must have "Description", "Quantity", "UnitPrice", and "Amount".
+        6.  **VERY IMPORTANT**: When the "ItemsList" array has more than one item, you MUST place a comma (,) between the JSON objects.
 
-        Here is the raw text from the invoice:
-        --- INVOICE TEXT ---
+        Here is an example of a perfect response:
+        {{
+            "InvoiceNumber": "INV-123",
+            "ItemsList": [
+                {{
+                    "Description": "Item A",
+                    "Quantity": 2,
+                    "UnitPrice": 50.00,
+                    "Amount": 100.00
+                }},
+                {{
+                    "Description": "Item B",
+                    "Quantity": 3,
+                    "UnitPrice": 25.00,
+                    "Amount": 75.00
+                }}
+            ],
+            ...
+        }}
+
+        --- INVOICE TEXT TO ANALYZE ---
         {raw_text}
         --- END OF TEXT ---
 
@@ -77,14 +102,10 @@ class LLMAgent:
 
         print("Sending text to Gemini for analysis")
         try:
-            # Calling the model to generate the content based on given prompt
             response = self.model.generate_content(prompt)
-
-            # Clean the response to ensure its valid JSON
-            cleaned_response = self.clean_json_response(response.text)
-
-            # Parsing the cleaned text into a Python Dictionary
-            parsed_json = json.loads(cleaned_response)
+            raw_text = response.candidates[0].content.parts[0].text if response.candidates else response.text
+            cleaned_response = self.clean_json_response(raw_text)
+            parsed_json = self.safe_json_parse(cleaned_response)
             print("Successfully extracted and parsed Invoice data")
             return parsed_json
 
@@ -130,5 +151,4 @@ if __name__ == '__main__':
 
         if extracted_data:
             print("\nExtracted Invoice Data (JSON):")
-            # Using json.dumps for pretty printing the dictionary
             print(json.dumps(extracted_data, indent=4))
