@@ -3,6 +3,7 @@ pydrive2
 google-api-python-client
 google-auth-httplib2
 google-auth-oauthlib
+google-generativeai
 
 # Environment variables
 python-dotenv
@@ -15,3 +16,7 @@ pdfplumber
 
 # Google Cloud Vision API for OCR detection
 google-cloud-vision
+
+# Requirements for Excel Agent
+pandas
+openpyxl
