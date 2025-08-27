@@ -1,8 +1,10 @@
 import os
 from flask import Flask, request, jsonify, send_file
 from agents.orchestrator import Orchestrator
+from flask_cors import CORS
 
 app = Flask(__name__)
+CORS(app) 
 
 
 # Globally Initialize the orchestrator once 

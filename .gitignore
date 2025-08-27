@@ -1,18 +1,77 @@
-# Python virtual environment
-venv/
-__pycache__/
-
-# Environment variables
-.env
-
-# Service account credentials file
-service_account.json
-
-# Downloaded and processed files
-downloads/
-Processed/
-
-# IDE and OS specific files
+--- General ---
+IDE and OS specific files
 .vscode/
 .idea/
 *.DS_Store
+*.suo
+.ntvs
+*.njsproj
+*.sln
+*.sw?
+
+Log files
+.log
+npm-debug.log
+yarn-debug.log*
+yarn-error.log*
+
+--- Python Backend ---
+Virtual environment
+backend/venv/
+backend/env/
+
+Python cache files
+backend/pycache/
+__pycache__/
+backend/*.pyc
+
+Secrets file (critical)
+backend/.env
+
+Google Service Account credentials (critical)
+backend/service_account.json
+
+Temporary data folders created by the application
+backend/downloads/
+backend/processed/
+
+--- React Frontend ---
+Node modules (very important to ignore)
+frontend/node_modules/
+
+Build output directory
+frontend/dist/
+
+Local environment variables for frontend
+frontend/.env.local
+frontend/.env.development.local
+frontend/.env.test.local
+frontend/.env.production.local
+
+Test coverage reports
+frontend/coverage/
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
