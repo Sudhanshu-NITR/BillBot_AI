@@ -53,7 +53,7 @@ export const BotInteractionSection = ({ driveLink, setDriveLink, status, setStat
     setErrorMessage('');
 
     try {
-      const response = await fetch('/process-invoices', {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/process-invoices`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ drive_link: driveLink }),

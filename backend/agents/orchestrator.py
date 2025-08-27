@@ -61,7 +61,7 @@ class Orchestrator:
                 continue
 
             # Using LLM to extract structured data from the raw text
-            invoice_data = self.llm_agent.extract_invoice_data(raw_text=raw_text)
+            invoice_data = self.llm_agent.run_agentic_extraction(raw_text=raw_text)
             if not invoice_data:
                 print(f"Skipping file {file_title} as data extraction failed.")
                 continue

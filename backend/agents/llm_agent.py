@@ -2,7 +2,11 @@ import os
 import json
 import re
 from dotenv import load_dotenv
-import google.generativeai as genai
+
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain.prompts import PromptTemplate
+from langchain.agents import AgentExecutor, create_react_agent
+from agents.tools import convert_currency
 
 # Load the env variables
 load_dotenv()
@@ -10,115 +14,101 @@ load_dotenv()
 class LLMAgent:
     """
     The agent responsible for interacting with the LLM (Gemini)
-    to extract structured data from raw text.
+    to extract structured data from raw text using LangChain.
     """
 
     def __init__(self):
-        # Initialize the LLM model
-
-        # Get the Gemini API key
-        api_key = os.getenv("GEMINI_API_KEY")
-
-        try:
-            # Get the Gemini Api key
-            if not api_key:
-                raise ValueError("GEMINI_API_KEY not found in environment variables.")
-            
-            # Configure the Generative AI library with Api key
-            genai.configure(api_key=api_key)
-
-            # Initialize the AI model
-            self.model = genai.GenerativeModel('gemini-1.5-flash')
-            print("Gemini Pro model initialized successfully.")
-            
-        except Exception as e:
-            print(f"Error initializing LLMAgent: {e}")
-            self.model = None
-
-    def clean_json_response(self, raw_response_text):
-        # Clean the markdown formatting done by LLM Agent
-
-        start_index = raw_response_text.find('{')
-        end_index = raw_response_text.rfind('}')
-
-        if start_index != -1 and end_index != -1 and end_index > start_index:
-            return raw_response_text[start_index : end_index + 1]
-        else:
-            print("Could not find a valid JSON object in the LLM response.")
-            return "{}"
+        # Initializing the LLM model
+        self.llm = ChatGoogleGenerativeAI(
+            model="gemini-1.5-flash",
+            temperature=0,
+            google_api_key=os.getenv("GOOGLE_API_KEY")
+        )
         
-    def safe_json_parse(self, text):
-        try:
-            return json.loads(text)
-        except json.JSONDecodeError:
-            text = re.sub(r",\s*}", "}", text)
-            text = re.sub(r",\s*]", "]", text)
-            return json.loads(text)
-    
-    def extract_invoice_data(self, raw_text):
-        # Send the raw text from an invoice and to LLM and get structured JSON format
-        if not self.model:
-            print("Model is not initialized. Cannot extract data.")
-            return None
+        # Defining the tools the agent can use
+        self.tools = [convert_currency]
         
-        prompt = f"""
+        # Creating the prompt template
+        prompt_template = self._create_prompt_template()
+        
+        # Creating the agent itself
+        agent = create_react_agent(self.llm, self.tools, prompt_template)
+        
+        # Creating the agent executor, which runs the agent
+        self.agent_executor = AgentExecutor(
+            agent=agent, 
+            tools=self.tools, 
+            verbose=True,                   # Setting to True to see the agent's thought process
+            handle_parsing_errors=True      # Gracefully handles any output errors
+        )
+        print("LangChain Agent initialized successfully with CurrencyConverterTool.")
+
+    def _create_prompt_template(self):
+        template = """
         You are an expert AI assistant for invoice data extraction.
-        Your task is to analyze the raw text and extract information into a valid JSON format.
+        Your goal is to extract key information from the provided invoice text and
+        convert the total amount to INR if necessary.
 
-        **CRITICAL RULES:**
-        1.  The final output MUST be a single, valid JSON object. Do not include any text before or after the JSON.
-        2.  Extract these fields: InvoiceNumber, InvoiceDate, VendorName, CustomerName, GSTIN, Subtotal, Tax, TotalAmount, Currency, PaymentTerms, ItemsList.
-        3.  If a field is not found, you MUST use the value "N/A".
-        4.  For numerical fields (Subtotal, Tax, TotalAmount, Quantity, UnitPrice, Amount), the value MUST be a number (e.g., 1250.00), NOT a string (e.g., "1250.00"). If not found, use "N/A".
-        5.  The "ItemsList" field MUST be an array of objects. Each object must have "Description", "Quantity", "UnitPrice", and "Amount".
-        6.  **VERY IMPORTANT**: When the "ItemsList" array has more than one item, you MUST place a comma (,) between the JSON objects.
+        You have access to the following tools:
+        {tools}
 
-        Here is an example of a perfect response:
-        {{
-            "InvoiceNumber": "INV-123",
-            "ItemsList": [
-                {{
-                    "Description": "Item A",
-                    "Quantity": 2,
-                    "UnitPrice": 50.00,
-                    "Amount": 100.00
-                }},
-                {{
-                    "Description": "Item B",
-                    "Quantity": 3,
-                    "UnitPrice": 25.00,
-                    "Amount": 75.00
-                }}
-            ],
-            ...
-        }}
+        To complete your task, you must use the following format:
 
-        --- INVOICE TEXT TO ANALYZE ---
-        {raw_text}
-        --- END OF TEXT ---
+        Thought: Do I need to use a tool? Yes or No.
+        Action: The tool to use, chosen from [{tool_names}].
+        Action Input: A single-line JSON string with no newlines that matches the tool's input schema exactly.
+                    For example: {{"amount": 1312.50, "from_currency": "USD"}}
+        Observation: The result of the tool call.
+        ... (this Thought/Action/Action Input/Observation can repeat N times) ...
 
-        Now, provide the structured JSON output.
+        Thought: I now have all the information required.
+        Final Answer: A single, valid JSON object containing the extracted data.
+
+        **JSON Output Rules:**
+        1. Extract these fields from the text: 
+        InvoiceNumber, InvoiceDate, VendorName, CustomerName, GSTIN, Subtotal, Tax, TotalAmount, Currency, PaymentTerms, ItemsList.
+        2. If a field is not found, use the value "N/A".
+        3. After using the currency tool, add this new field to the JSON:
+        - "TotalAmountINR": The final converted amount in INR. If the currency is already INR, just use the original TotalAmount.
+        4. All numerical values in the JSON must be numbers (not strings).
+        5. The "ItemsList" field must be an array of objects. Each object must have "Description", "Quantity", "UnitPrice", and "Amount".
+        6. If there are multiple items in "ItemsList", separate them with a comma.
+        7. The final answer must be a single JSON object — no extra text or explanation.
+
+        Begin!
+
+        Invoice Text:
+        {input}
+
+        {agent_scratchpad}
         """
+        return PromptTemplate.from_template(template)
 
-        print("Sending text to Gemini for analysis")
+    def run_agentic_extraction(self, raw_text: str) -> dict:
+        # Runs the LangChain agent to perform the full extraction and tool-use workflow.
+        print("Starting LangChain agent execution...")
         try:
-            response = self.model.generate_content(prompt)
-            raw_text = response.candidates[0].content.parts[0].text if response.candidates else response.text
-            cleaned_response = self.clean_json_response(raw_text)
-            parsed_json = self.safe_json_parse(cleaned_response)
-            print("Successfully extracted and parsed Invoice data")
-            return parsed_json
+            response = self.agent_executor.invoke({"input": raw_text})
+            
+            # The final answer is in the 'output' key. It's a string that needs to be parsed.
+            final_answer_str = response.get("output", "{}")
+            
+            # Cleaning up any markdown formatting before parsing
+            match = re.search(r"\{.*\}", final_answer_str, re.DOTALL)
+            if match:
+                json_str = match.group(0)
+                return json.loads(json_str)
+            else:
+                print("\nAgent did not return a valid JSON object.")
+                return {"error": "Failed to parse agent's final answer."}
 
-        except json.JSONDecodeError as e:
-            print(f"Error decodinng JSON from LLM response. Error: {e}")
-            print(f"\nRaw response was {response.text}")
-            return None
         except Exception as e:
-            print(f"An error occured while communicating with the LLM. Error: {e}")
-            return None
+            print(f"\nAn error occurred during agent execution: {e}")
+            return {"error": str(e)}
         
 
 if __name__ == '__main__':
+    # Testing locally
     sample_invoice_text = """
     MegaCorp Solutions
     123 Innovation Drive, Tech City
@@ -142,13 +132,18 @@ if __name__ == '__main__':
     Vendor GSTIN: 22AABCU9567R1Z5
     """
 
-    print("--- Initializing LLMAgent ---")
-    llm_agent = LLMAgent()
+    print("Initializing LLMAgent for a direct test")
+    try:
+        llm_agent = LLMAgent()
+        print("\nRunning agentic extraction from sample text")
+        extracted_data = llm_agent.run_agentic_extraction(sample_invoice_text)
 
-    if llm_agent.model:
-        print("\n--- Extracting data from sample text ---")
-        extracted_data = llm_agent.extract_invoice_data(sample_invoice_text)
-
-        if extracted_data:
-            print("\nExtracted Invoice Data (JSON):")
+        if extracted_data and "error" not in extracted_data:
+            print("\nFinal Extracted Data (JSON):")
             print(json.dumps(extracted_data, indent=4))
+        else:
+            print("\nAgentic extraction failed or returned an error.")
+            print(f"   Result: {extracted_data}")
+            
+    except Exception as e:
+        print(f"\nA fatal error occurred during the test run: {e}")

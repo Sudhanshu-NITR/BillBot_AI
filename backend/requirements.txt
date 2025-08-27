@@ -24,3 +24,8 @@ openpyxl
 # Flask Api 
 flask
 flask-cors
+
+# Adding langchain imports
+langchain
+langchain-google-genai
+langchain-core
