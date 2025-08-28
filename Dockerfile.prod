@@ -1,31 +1,41 @@
-# -------- Build the frontend --------
+# Build the frontend
 FROM node:22-alpine AS frontend-builder
 
 WORKDIR /app/frontend
+
 COPY frontend/package*.json ./
+
 RUN npm install --production
+
 COPY frontend/ ./
+
 RUN npm run build
 
-# -------- Build the backend --------
+# Build the backend
 FROM python:3.9-slim AS backend-builder
 
 WORKDIR /app
+
 COPY backend/requirements.txt .
+
 RUN pip install --no-cache-dir -r requirements.txt
+
 COPY backend/ .
 
-# -------- Final production image --------
+# Final production image
 FROM python:3.9-slim
 
 WORKDIR /app
 
 # Copy backend code
 COPY backend/requirements.txt .
+
 RUN pip install --no-cache-dir -r requirements.txt gunicorn
 
 COPY --from=backend-builder /app /app
+
 COPY --from=frontend-builder /app/frontend/dist /app/static
 
 EXPOSE 5000
+
 CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "2", "--threads", "4", "app:app"]
