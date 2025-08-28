@@ -1,0 +1,27 @@
+# Backend Service
+FROM python:3.9-slim AS backend
+
+WORKDIR /app
+
+COPY backend/requirements.txt .
+
+RUN pip install -r requirements.txt
+
+COPY backend/ .
+
+CMD ["flask", "run", "--host=0.0.0.0"]
+
+# Frontend Service
+FROM node:22-alpine AS frontend
+
+WORKDIR /src
+
+COPY frontend/package*.json .
+
+RUN npm install
+
+COPY frontend/ .
+
+EXPOSE 5173
+
+CMD ["npm", "run", "dev"]
