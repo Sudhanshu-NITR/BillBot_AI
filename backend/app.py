@@ -1,7 +1,28 @@
 import os
+import threading
+import time
+import requests
 from flask import Flask, request, jsonify, send_file, send_from_directory
 from agents.orchestrator import Orchestrator
 from flask_cors import CORS
+
+KEEP_ALIVE_URL = "https://billbot-ai.onrender.com"
+PING_INTERVAL = 30 # in seconds
+
+def ping_website():
+    """Sends a GET request to the keep-alive URL."""
+    try:
+        response = requests.get(KEEP_ALIVE_URL)
+        print(f"Keep-alive ping sent to {KEEP_ALIVE_URL}, Status: {response.status_code}")
+    except requests.exceptions.RequestException as e:
+        print(f"Keep-alive ping failed: {e}")
+
+def keep_alive():
+    """Runs the ping function in an infinite loop with a delay."""
+    while True:
+        ping_website()
+        time.sleep(PING_INTERVAL)
+
 
 # Initializing Flask, pointing static to React build
 app = Flask(__name__, static_folder="static", static_url_path="")
@@ -65,4 +86,9 @@ def not_found(_):
 
 # Main Entrypoint
 if __name__ == '__main__':
+    keep_alive_thread = threading.Thread(target=keep_alive)
+    keep_alive_thread.daemon = True
+    keep_alive_thread.start()
+    
+    # Run the Flask app
     app.run(host='0.0.0.0', port=5000, debug=True)
