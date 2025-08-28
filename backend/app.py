@@ -3,11 +3,11 @@ from flask import Flask, request, jsonify, send_file, send_from_directory
 from agents.orchestrator import Orchestrator
 from flask_cors import CORS
 
-# Initialize Flask, pointing static to React build
+# Initializing Flask, pointing static to React build
 app = Flask(__name__, static_folder="static", static_url_path="")
 CORS(app)
 
-# -------- Orchestrator Initialization --------
+# Orchestrator Initialization
 try:
     print("Initializing the master Orchestrator... This may take a moment.")
     orchestrator = Orchestrator()
@@ -17,7 +17,7 @@ except Exception as e:
     orchestrator = None
 
 
-# -------- API Endpoints --------
+# API Endpoints
 @app.route('/process-invoices', methods=['POST'])
 def process_invoices():
     """
@@ -51,7 +51,7 @@ def process_invoices():
         return jsonify({"error": "Internal server error occurred."}), 500
 
 
-# -------- React Frontend Routes --------
+# React Frontend Routes
 @app.route("/")
 def index():
     """Serve React index.html"""
@@ -63,6 +63,6 @@ def not_found(_):
     return send_from_directory(app.static_folder, "index.html")
 
 
-# -------- Main Entrypoint --------
+# Main Entrypoint
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
