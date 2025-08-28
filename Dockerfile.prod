@@ -5,7 +5,7 @@ WORKDIR /app/frontend
 
 COPY frontend/package*.json ./
 
-RUN npm install --production
+RUN npm install
 
 COPY frontend/ ./
 
@@ -37,5 +37,6 @@ COPY --from=backend-builder /app /app
 COPY --from=frontend-builder /app/frontend/dist /app/static
 
 EXPOSE 5000
+
 
 CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "2", "--threads", "4", "app:app"]
